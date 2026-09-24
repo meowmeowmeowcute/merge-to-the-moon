@@ -1,6 +1,6 @@
 # SPEC：Merge to the Moon（月餅合成）
 
-> 版本：v1.1（P2：補齊測試需要的介面）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
+> 版本：v1.2（P6：像素圖產生方式、HUD 位置、除錯入口）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
 > 流程：Idea → **Spec** → AI 實作 → Review → 修改 Spec → 再實作。
 > 本文件描述的行為要能直接對應到測試（見第 7 節對照表）。行為有改動時，先改這份文件並另外 commit（`docs: update spec ...`）。
 
@@ -175,9 +175,10 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 ### 4.9 畫面與特效（render）
 
 - **Canvas**：邏輯解析度 400×700，依照視窗等比縮放（contain），並考慮 `devicePixelRatio`；`imageSmoothingEnabled = false`。
-- **像素圖**：每一階用 palette 加字串陣列定義（16×16 或 24×24 格），在 offscreen canvas 預先繪製後快取；繪製時縮放到直徑 2r，並依 `body.angle` 旋轉。像素圖外形接近圓形，和碰撞圓的誤差不超過 1 格。
+- **像素圖**：每一階由 `buildSpriteGrid(tier)`（純函式）**以程式產生** palette 索引字串網格：圓形遮罩＋右下月牙陰影＋左上高光＋外框，再加上各階專屬裝飾（紅印、芝麻、花紋、花邊、葉子、坑洞…）。網格邊長 = `round(2r / 3.5)`（最小 7），讓各階的像素顆粒大小一致（每格約 3～4.5 邏輯 px）。網格在 offscreen canvas 預先繪製後快取；繪製時縮放到直徑 2r，並依 `body.angle` 旋轉。外形和碰撞圓的誤差不超過 1 格（由 `sprites.test.js` 驗證）。
+  - 為什麼不手繪字串：9 張圖手刻工作量大，又很難保證外形貼合碰撞圓；程式產生的網格可以直接用測試驗證。
 - **場景**：像素夜空、星星、雲；容器像木盒；警戒線是虛線，`overTime > 0` 時閃紅。
-- **HUD**：左上是分數和最高分，右上是「下一個」預覽；手上物件和一條淡淡的投放導引線畫在 `aimX`。
+- **HUD**：用 DOM 放在畫布上方（分數、最高分、「下一個」預覽），不佔用投放區；手上物件和一條淡淡的投放導引線畫在 `aimX`。
 - **合成特效**（由 `merge` 事件觸發，存活約 0.3～0.8 秒）：
   - 粒子：8～16 顆方形像素，顏色取自新階 palette，向外噴散並受重力影響。
   - Pop：新物件的**視覺**縮放 0.6 → 1.1 → 1.0（約 200ms），物理半徑不變。
@@ -193,6 +194,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 - 畫布設定 `touch-action: none`；頁面禁止雙擊縮放和拉動回彈，避免誤觸捲動。
 - `visibilitychange` 切到背景時 `pause()`，回到前景時 `resume()`。
 - 主迴圈用 `requestAnimationFrame`，把兩幀的時間差傳給 `game.step(dt)`。
+- 除錯：網址加上 `?debug` 時，把 game 掛到 `window.__game`，方便在 console 擺放物件、快轉 `step`。
 
 ### 4.11 UI 流程
 
@@ -252,6 +254,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | `spawner.test.js` | AC2 | 1000 次只出現 {1, 2} 而且兩者都有；同 seed 同序列；`peek` 不消耗 |
 | `physics.test.js` | AC3、AC7 | 重力落下、停在地板（誤差 ≤ 1px）、最大階高速落下不穿隧、大水平速度不穿牆、不同階疊放不重疊、靜止後速度 < ε |
 | `merge.test.js` | AC4～AC8 | 同階合成（id 移除、階 + 1、中點）、不同階不合成、三個同時接觸只合成一對、重複事件不重複合成、靜止相貼也合成、密集堆中合成時的速度上限和容器限制、速度平均加上限、連鎖、月亮不合成加 moon 事件只觸發一次 |
+| `sprites.test.js` | 4.9 | 每階網格尺寸正確、不透明格不超出碰撞圓 1 格、圓內超過 1 格的地方不能透明、只使用 palette 內的索引、各階顆粒大小一致 |
 | `rules.test.js` | AC10～AC12 | 計分、最高分更新和保存、storage 丟錯不崩潰、超線 < 2s 或 ≥ 2s、投放豁免、restart 歸零、投放冷卻、aimX clamp、非 playing 時不能投放 |
 
 **容差約定**：位置 ±1px（靜止判定）或 ±2px（合成中點）；重疊判定：圓心距離 ≥ r1 + r2 − 1.5；靜止：所有物件的 `|v| < 0.05`，並持續 30 個 substep。
