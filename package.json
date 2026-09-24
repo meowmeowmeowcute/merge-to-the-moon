@@ -1,0 +1,18 @@
+{
+  "name": "merge-to-the-moon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "月餅合成：中秋主題的像素風物理合成 H5 小遊戲",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/",
+    "vendor": "node -e \"const fs=require('fs');fs.mkdirSync('src/vendor',{recursive:true});fs.copyFileSync('node_modules/matter-js/build/matter.min.js','src/vendor/matter.min.js')\"",
+    "serve": "npx --yes http-server src -p 8080 -c-1"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "matter-js": "^0.20.0"
+  }
+}
