@@ -16,7 +16,7 @@ const types = {
   '.ico': 'image/x-icon',
 };
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   const file = normalize(join(root, path.endsWith('/') ? `${path}index.html` : path));
   if (!file.startsWith(root)) {
@@ -30,4 +30,19 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end('Not found');
   }
-}).listen(port, () => console.log(`Serving src/ at http://localhost:${port}`));
+});
+
+// port 被佔用時自動往後找（最多試 10 個）
+function listen(p, triesLeft = 10) {
+  server.once('error', (err) => {
+    if (err.code === 'EADDRINUSE' && triesLeft > 0) {
+      console.log(`Port ${p} 已被使用，改試 ${p + 1}…`);
+      listen(p + 1, triesLeft - 1);
+    } else {
+      throw err;
+    }
+  });
+  server.listen(p);
+}
+server.once('listening', () => console.log(`Serving src/ at http://localhost:${server.address().port}`));
+listen(port);
