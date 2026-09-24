@@ -77,10 +77,11 @@
 
 ### 3.2 核心規則
 
-1. **生成**：每次隨機產生 **第 1 階或第 2 階**（機率在 config 設定，預設 60% / 40%）。畫面上要顯示「下一個」預覽。隨機數使用**可注入 seed 的 RNG**，方便測試。
+1. **生成**：每次隨機產生 **第 1～4 階**（機率在 config 設定，預設 40% / 30% / 20% / 10%）。**不顯示「下一個」預覽**，保留隨機感。隨機數使用**可注入 seed 的 RNG**，方便測試。
+   > 變更紀錄：原本是「第 1 或第 2 階加上下一個預覽」，試玩後改成 1～4 階、不預告（2026-09-24）。
 2. **投放**：玩家左右移動（滑鼠移動、觸控拖曳、鍵盤 ←→），放開或點擊後從頂部掉下。有**投放冷卻**（預設 500ms），避免連點。投放位置限制在牆內（考慮物件半徑）。
 3. **合成**：兩個**同階**物件接觸時：
-   - 兩者移除，在**接觸中點**生成一個高一階的物件，繼承兩者的平均速度（並設上限）。
+   - 兩者移除，在**接觸中點**生成一個高一階的物件，繼承兩者的平均速度（慣性），再**往上彈一下**，並把周圍的物件**推開**（速度都有上限）。
    - 一個物件在同一個 step 內**只能參與一次合成**（用 `merging` 標記加合成佇列，在 `Engine.update` 之後統一處理）。
    - 同時監聽 `collisionStart` 和 `collisionActive`，避免兩個同階物件靜止相貼卻沒合成。
    - 新物件可以再跟相鄰的同階物件**連鎖合成**。
@@ -139,7 +140,7 @@ Merge to the Moon/
 │   ├── game/
 │   │   ├── config.js        # 階級表、常數
 │   │   ├── rng.js           # 可設 seed 的 RNG
-│   │   ├── spawner.js       # 產生第 1 或第 2 階
+│   │   ├── spawner.js       # 產生第 1～4 階
 │   │   ├── world.js         # Matter engine、容器、投放
 │   │   ├── merge.js         # 合成偵測與處理
 │   │   ├── rules.js         # 計分、Game Over 判定
@@ -177,7 +178,7 @@ Merge to the Moon/
 ### Acceptance Criteria（驗收條件）
 
 - [ ] AC1：階級表至少 9 階（≥ 8 次合成），半徑嚴格遞增，最後一階是月亮。
-- [ ] AC2：每次生成的物件只會是第 1 或第 2 階，並顯示下一個預覽。
+- [ ] AC2：每次生成的物件只會是第 1～4 階，不顯示下一個預覽。
 - [ ] AC3：物件受重力落下，停在容器底部或其他物件上，不會穿透地板或牆壁。
 - [ ] AC4：兩個同階物件接觸後在 1 個 step 內合成一個高一階的物件，位置在兩者中點。
 - [ ] AC5：不同階物件接觸不會合成。
@@ -236,7 +237,7 @@ Merge to the Moon/
 ### 6.3 規則與設定（`config.test.js`、`spawner.test.js`、`rules.test.js`）
 
 - 階級表長度 ≥ 9、半徑嚴格遞增、最後一階是月亮。
-- 生成器取 1000 次，結果只有 1 或 2，而且兩者都會出現；相同 seed 產生相同序列。
+- 生成器取 1000 次，結果只有 1～4，而且四種都會出現；相同 seed 產生相同序列。
 - 計分：合成出第 n 階時加上對應分數；最高分更新邏輯（mock storage，storage 丟錯時不崩潰）。
 - Game Over：超過警戒線 < 2s 不結束、≥ 2s 結束、剛投放的物件在豁免期內不計；重開後狀態全部歸零。
 - 投放：冷卻期間投放無效；投放 x 會被限制在牆內。
@@ -267,7 +268,7 @@ Merge to the Moon/
 | P5 | 規則：計分、Game Over、最高分 → 全部測試通過 | `feat: add scoring and game over rules` |
 | P6 | 像素 sprites 和 renderer，接上 main.js，瀏覽器可以玩 | `feat: add pixel-art sprites and canvas renderer` |
 | P7 | 合成特效和月亮慶祝特效 | `feat: add merge particles and moon celebration` |
-| P8 | UI：開始、Game Over、再一局、下一個預覽、分享、RWD、觸控 | `feat: add game UI, share and mobile controls` |
+| P8 | UI：開始、Game Over、再一局、暫停、靜音、分享、RWD、觸控 | `feat: add game UI, share and mobile controls` |
 | P9 | 部署：GitHub Actions（test → deploy `src/`），確認公開網址 | `ci: deploy to github pages` |
 | P10 | README.md、RETROSPECTIVE.md、最終檢查 | `docs: add readme and retrospective` |
 
