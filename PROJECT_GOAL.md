@@ -143,7 +143,8 @@ Merge to the Moon/
 │   │   ├── world.js         # Matter engine、容器、投放
 │   │   ├── merge.js         # 合成偵測與處理
 │   │   ├── rules.js         # 計分、Game Over 判定
-│   │   └── storage.js       # localStorage（最高分）
+│   │   ├── storage.js       # localStorage（最高分）
+│   │   └── game.js          # 組合以上模組，UI 唯一入口（狀態機、step、drop）
 │   └── render/
 │       ├── sprites.js       # 像素圖定義與快取
 │       ├── renderer.js      # Canvas 繪製
