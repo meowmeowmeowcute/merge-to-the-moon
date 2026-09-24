@@ -5,7 +5,7 @@ export const TIERS = [
   { tier: 1, id: 'sesame', name: '芝麻', radius: 12, score: 0, palette: ['#2b2320', '#f4ead5', '#ffffff', '#cbbd9f', '#3a302b'] },
   { tier: 2, id: 'lotus', name: '蓮子', radius: 17, score: 2, palette: ['#5a4630', '#f3e2a9', '#fff6d6', '#d4bd78', '#9c7b45'] },
   { tier: 3, id: 'yolk', name: '蛋黃', radius: 24, score: 4, palette: ['#7a3b0c', '#f59e1b', '#ffd36b', '#d1700a', '#ffe9a8'] },
-  { tier: 4, id: 'mungbean', name: '綠豆椪', radius: 32, score: 8, palette: ['#6b5a45', '#f7f1e3', '#ffffff', '#ddd2b8', '#8fbf5a'] },
+  { tier: 4, id: 'mungbean', name: '綠豆椪', radius: 32, score: 8, palette: ['#6b5a45', '#f7f1e3', '#ffffff', '#ddd2b8', '#8fbf5a', '#d63c3c'] },
   { tier: 5, id: 'yolkpastry', name: '蛋黃酥', radius: 40, score: 16, palette: ['#6e3a12', '#e8a33c', '#ffd27a', '#b8711f', '#2b1d12'] },
   { tier: 6, id: 'snowskin', name: '冰皮月餅', radius: 50, score: 32, palette: ['#8a4a63', '#f7b8cf', '#ffe3ee', '#e08aab', '#b6e3a1'] },
   { tier: 7, id: 'cantonese', name: '廣式月餅', radius: 62, score: 64, palette: ['#3d1f0c', '#a8612a', '#d68f4a', '#7a3f16', '#f0c27a'] },
