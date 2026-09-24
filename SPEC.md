@@ -100,7 +100,7 @@
 
 - 物件一律是 Matter **圓形**剛體，半徑為 `TIERS[tier-1].radius`，`restitution` 和 `friction` 依照 `GAME`。
 - 自訂屬性：`body.isFruit = true`、`body.tier`、`body.bornAt`（模擬時間 ms）、`body.merging`（合成佇列鎖，預設 false）。
-- 牆和地板是 static 矩形，內緣剛好在 x = 0、x = WIDTH、y = HEIGHT。
+- 牆和地板是 static 矩形，內緣剛好在 x = 0、x = WIDTH、y = HEIGHT。左右牆從 y < 0（畫面頂端以上）一路延伸到地板，避免彈高的物件從牆頂飛出去。
 
 ### 4.3 Game 介面與狀態機
 
