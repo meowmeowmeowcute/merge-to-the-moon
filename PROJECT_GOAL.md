@@ -286,11 +286,12 @@ Merge to the Moon/
 
 ## 9. 最終檢查清單（交件前）
 
-- [ ] 公開網址可以打開，手機實機可以玩
-- [ ] `npm test` 全部通過，CI 綠燈
-- [ ] commit 歷史看得出進度（P0～P10），不是只有一個 commit
-- [ ] `README.md`（簡介、`## Demo`、`## Development`、`## AI Tools`）
-- [ ] `SPEC.md`（要做什麼、主要功能、系統行為、Acceptance Criteria、Non-goals）
-- [ ] `RETROSPECTIVE.md`（6 題加至少 1 個 Incident）
-- [ ] `src/` 存在，而且是部署根目錄
+- [x] 公開網址可以打開（https://meowmeowmeowcute.github.io/merge-to-the-moon/）
+- [ ] 手機實機可以玩（待實機確認）
+- [x] `npm test` 全部通過，CI 綠燈
+- [x] commit 歷史看得出進度（P0～P10），不是只有一個 commit
+- [x] `README.md`（簡介、`## Demo`、`## Development`、`## AI Tools`）
+- [x] `SPEC.md`（要做什麼、主要功能、系統行為、Acceptance Criteria、Non-goals）
+- [x] `RETROSPECTIVE.md`（6 題加至少 1 個 Incident）
+- [x] `src/` 存在，而且是部署根目錄
 - [ ] 自己能說明：怎麼跑、怎麼 build（無需 build）、怎麼 deploy、合成和物理怎麼運作
