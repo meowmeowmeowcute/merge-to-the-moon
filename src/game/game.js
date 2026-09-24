@@ -1,9 +1,11 @@
-// 遊戲入口：狀態機、固定步長、投放（SPEC 4.3～4.5）。
+// 遊戲入口：狀態機、固定步長、投放、合成計分、Game Over（SPEC 4.3～4.8）。
 import { GAME, MAX_TIER, tierInfo } from './config.js';
 import { createRng } from './rng.js';
 import { createSpawner } from './spawner.js';
 import { createWorld } from './world.js';
 import { createMergeSystem } from './merge.js';
+import { nextOverTime, isGameOver } from './rules.js';
+import { loadBest, saveBest } from './storage.js';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -27,7 +29,7 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     next: 0,
     aimX: GAME.WIDTH / 2,
     score: 0,
-    best: 0,
+    best: loadBest(storage),
     maxTier: 0,
     overTime: 0,
     world,
@@ -89,12 +91,21 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     merge.flush(game.now);
     limitSpeeds();
     game.now += GAME.TIMESTEP;
+    game.overTime = nextOverTime(game.overTime, world.fruits(), game.now);
+    if (isGameOver(game.overTime)) {
+      game.state = 'over';
+      emit('gameover', { score: game.score, best: game.best, maxTier: game.maxTier });
+    }
   }
 
   function handleMerge({ fromTier, toTier, x, y }) {
     const gained = tierInfo(toTier).score;
     game.score += gained;
     game.maxTier = Math.max(game.maxTier, toTier);
+    if (game.score > game.best) {
+      game.best = game.score;
+      saveBest(storage, game.best);
+    }
     emit('merge', { fromTier, toTier, x, y, gained, score: game.score });
     if (toTier === MAX_TIER && !moonSeen) {
       moonSeen = true;
