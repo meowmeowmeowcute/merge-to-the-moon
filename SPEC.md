@@ -1,6 +1,6 @@
 # SPEC：Merge to the Moon（月餅合成）
 
-> 版本：v1.0（P1）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
+> 版本：v1.1（P2：補齊測試需要的介面）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
 > 流程：Idea → **Spec** → AI 實作 → Review → 修改 Spec → 再實作。
 > 本文件描述的行為要能直接對應到測試（見第 7 節對照表）。行為有改動時，先改這份文件並另外 commit（`docs: update spec ...`）。
 
@@ -90,8 +90,8 @@
 |------|------------------|
 | `rng.js` | `createRng(seed: number) → () => number`，回傳 [0, 1)，相同 seed 產生相同序列（mulberry32） |
 | `spawner.js` | `createSpawner({ rng, weights = GAME.SPAWN_WEIGHTS }) → { peek(): tier, next(): tier }`。`peek` 看下一個但不消耗，`next` 取出並產生新的下一個 |
-| `world.js` | `createWorld(Matter) → { engine, addFruit(tier, x, y, { bornAt }) → body, removeFruit(body), fruits(): body[], clear() }`。建立地板和左右牆（static），沒有天花板 |
-| `merge.js` | `createMergeSystem(Matter, world, { onMerge }) → { flush(now) }`。監聽 engine 的 `collisionStart` 和 `collisionActive`，把同階配對放進佇列；`flush` 在 `Engine.update` 之後處理佇列 |
+| `world.js` | `createWorld(Matter) → { engine, addFruit(tier, x, y, { bornAt }) → body, removeFruit(body), fruits(): body[], clear() }`。建立地板和左右牆（static），沒有天花板；`bornAt` 預設 0 |
+| `merge.js` | `createMergeSystem(Matter, world, { onMerge }) → { flush(now) }`。監聽 engine 的 `collisionStart` 和 `collisionActive`，把同階配對放進佇列；`flush` 在 `Engine.update` 之後處理佇列（移除、生成新物件），每合成一對呼叫一次 `onMerge({ fromTier, toTier, x, y, body })`（body 是新物件）。**計分和事件由 game 在 onMerge 裡處理**，merge.js 不管分數 |
 | `rules.js` | 計分和 Game Over 判定（純函式或小型狀態物件，不依賴 Matter） |
 | `storage.js` | `loadBest(storage) → number`、`saveBest(storage, value)`。key 是 `merge-to-the-moon:best`；storage 是 null 或丟錯時不能崩潰（load 回傳 0，save 靜默失敗） |
 | `game.js` | `createGame(Matter, { seed, storage }) → Game`，組合上述模組，是 UI 唯一需要呼叫的入口 |
@@ -120,11 +120,12 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | `drop()` | 見 4.5，成功回傳 body，失敗回傳 null |
 | `current` / `next` | 手上物件的階、下一個物件的階 |
 | `aimX` | 手上物件目前的 x（初始值是 WIDTH / 2） |
-| `score` / `best` / `maxTier` | 本局分數、最高分、本局達到的最高階 |
+| `score` / `best` / `maxTier` | 本局分數、最高分、本局達到的最高階（初始 0，投放和合成時更新為 max） |
 | `now` | 目前模擬時間（ms） |
 | `overTime` | 目前連續超線的時間（ms），UI 用它來讓警戒線閃爍 |
 | `pause()` / `resume()` / `paused` | 暫停時 `step` 不推進 |
 | `fruits()` | 目前所有物件（給 renderer 用） |
+| `world` | 內部的 world 物件（4.1），給測試和除錯直接擺放物件用，UI 不使用 |
 | `on(event, fn)` | 訂閱事件（見 4.8） |
 
 ### 4.4 Substep 順序（每個 `TIMESTEP` 一次）
@@ -150,8 +151,8 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
    - 位置 = 兩圓心的中點，再 clamp：`x ∈ [R, WIDTH - R]`、`y ≤ HEIGHT - R`。
    - 速度 = 兩者速度的平均，再限制到 `MAX_SPEED`。
    - 移除兩個舊物件，加入新物件（`bornAt` = 兩者中較早的那個，**不給**投放豁免）。
-   - 分數 `+= TIERS[t-1].score`；`maxTier = max(maxTier, t)`；若 `score > best`，就更新 best 並 `saveBest`。
-   - 發出 `merge` 事件；若 `t === MAX_TIER` 而且本局第一次出現月亮，再發出 `moon` 事件。
+   - 呼叫 `onMerge`。game 收到後：分數 `+= TIERS[t-1].score`；`maxTier = max(maxTier, t)`；若 `score > best`，就更新 best 並 `saveBest`；
+     發出 `merge` 事件；若 `t === MAX_TIER` 而且本局第一次出現月亮，再發出 `moon` 事件。
 3. **連鎖**：新物件在後續 substep 若接觸同階物件，照同樣規則繼續合成（不需要特別處理）。
 4. **月亮**：`tier === MAX_TIER` 的物件永遠不進合成佇列，兩顆月亮只會正常碰撞。
 5. **碰撞合理性**：合成出的大物件擠開周圍物件時，靠 4.4 的速度上限避免物件被彈飛；牆和地板保證物件不會離開容器。
