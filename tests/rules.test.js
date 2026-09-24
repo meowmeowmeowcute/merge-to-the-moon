@@ -108,7 +108,7 @@ test('moveTo 把 aimX clamp 在牆內（依手上物件半徑）', () => {
   assert.equal(game.aimX, 123);
 });
 
-test('投放冷卻 500ms：冷卻中投放無效，冷卻後可以投放', () => {
+test('投放冷卻 250ms：冷卻中投放無效，冷卻後可以投放', () => {
   const game = newGame();
   assert.ok(game.drop(), '第一次投放不受冷卻限制');
   assert.equal(game.drop(), null);

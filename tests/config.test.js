@@ -51,7 +51,9 @@ test('SPEC 3.2 常數', () => {
   assert.equal(GAME.HEIGHT, 700);
   assert.ok(GAME.DANGER_Y > GAME.DROP_Y);
   assert.ok(Math.abs(GAME.TIMESTEP - 1000 / 60) < 1e-9);
-  assert.equal(GAME.DROP_COOLDOWN, 500);
+  assert.equal(GAME.DROP_COOLDOWN, 250);
+  assert.equal(GAME.HOLD_DELAY, 400);
+  assert.equal(GAME.HOLD_MOVE_TOLERANCE, 10);
   assert.equal(GAME.DROP_GRACE, 1500);
   assert.equal(GAME.OVER_LINE_LIMIT, 2000);
   assert.equal(GAME.DANGER_Y, 170);

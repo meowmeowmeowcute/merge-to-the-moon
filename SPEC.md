@@ -118,7 +118,7 @@
 | `storage.js` | `loadBest(storage) → number`、`saveBest(storage, value)`。key 是 `merge-to-the-moon:best`；storage 是 null 或丟錯時不能崩潰（load 回傳 0，save 靜默失敗） |
 | `game.js` | `createGame(Matter, { seed, storage }) → Game`，組合上述模組，是 UI 唯一需要呼叫的入口 |
 | `share.js` | `buildShareText({ score, maxTier }) → string`，產生分享文字（純函式） |
-| `hold.js` | `createHoldControl({ holdDelay, moveTolerance }) → { press(x, t), move(x, t), release(t) → boolean, shouldRepeat(t) → boolean, pressed, repeating }`：長按連續投放的狀態機（純函式，見 4.10） |
+| `hold.js` | `createHoldControl({ holdDelay, moveTolerance }) → { press(x, t), move(x, t), release(t) → boolean, cancel(), shouldRepeat(t) → boolean, pressed, repeating }`：長按連續投放的狀態機（純函式，見 4.10） |
 
 ### 4.2 物件（Fruit body）
 
@@ -224,7 +224,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
   - `press`：按下時記錄位置和時間。
   - `move`：還沒進入連續模式時，若離按下位置超過 `HOLD_MOVE_TOLERANCE`，就標記為「拖曳瞄準」，這次按壓不會進入連續模式。
   - `shouldRepeat(t)`：按住中、不是拖曳，而且 `t − 按下時間 ≥ HOLD_DELAY` → 進入連續模式並回傳 true；之後在放開前都回傳 true（即使手指移動，也會跟著瞄準繼續投放）。
-  - `release`：回傳「放開時是否要投放一次」＝ 這次按壓**沒有**進入連續模式；並重設狀態。`pointercancel` 只重設，不投放。
+  - `release`：回傳「放開時是否要投放一次」＝ 這次按壓**沒有**進入連續模式；並重設狀態。`pointercancel` 呼叫 `cancel()`，只重設、不投放。
   - 主迴圈每幀在 `shouldRepeat` 為 true 時呼叫 `drop()`，實際間隔由 `DROP_COOLDOWN` 決定。
 - 鍵盤：← / → 每幀移動 6px（按住連續移動）；Space 或 Enter 按下時投放一次，按住 ≥ `HOLD_DELAY` 後連續投放。
 - 畫布設定 `touch-action: none`；頁面禁止雙擊縮放和拉動回彈，避免誤觸捲動。
