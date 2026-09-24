@@ -2,6 +2,7 @@
 import { createGame } from './game/game.js';
 import { GAME, MAX_TIER, tierInfo } from './game/config.js';
 import { buildShareText } from './game/share.js';
+import { createHoldControl } from './game/hold.js';
 import { bakeSprites } from './render/sprites.js';
 import { createRenderer, drawSpriteInto } from './render/renderer.js';
 import { createEffects } from './render/effects.js';
@@ -70,23 +71,39 @@ const toLogicalX = (clientX) => {
 };
 const canAim = () => game.state === 'playing' && !game.paused;
 
+// 點一下／拖曳後放開 → 投放一次；按住不動 0.4 秒 → 連續投放（SPEC 4.10）
+const hold = createHoldControl();
+let spaceHeldSince = null; // 空白鍵按下的時間，放開時為 null
+
+function stopHolding() {
+  hold.cancel();
+  spaceHeldSince = null;
+}
+
 // 瀏覽器要求使用者操作後才能播放聲音
 window.addEventListener('pointerdown', () => audio.unlock(), { capture: true });
 window.addEventListener('keydown', () => audio.unlock(), { capture: true });
 
 canvas.addEventListener('pointerdown', (e) => {
   if (!canAim()) return;
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* 無效的 pointerId 時不影響投放 */ }
   game.moveTo(toLogicalX(e.clientX));
+  hold.press(e.clientX, performance.now());
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (canAim()) game.moveTo(toLogicalX(e.clientX));
-});
-canvas.addEventListener('pointerup', (e) => {
   if (!canAim()) return;
   game.moveTo(toLogicalX(e.clientX));
-  game.drop();
+  hold.move(e.clientX);
 });
+canvas.addEventListener('pointerup', (e) => {
+  if (!canAim()) {
+    hold.cancel();
+    return;
+  }
+  game.moveTo(toLogicalX(e.clientX));
+  if (hold.release()) game.drop();
+});
+canvas.addEventListener('pointercancel', () => hold.cancel());
 
 const keys = new Set();
 window.addEventListener('keydown', (e) => {
@@ -97,18 +114,28 @@ window.addEventListener('keydown', (e) => {
     setPaused(!game.paused);
   } else if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
+    if (e.repeat) return; // 按住時由主迴圈連續投放
     if (game.state === 'ready') startGame();
     else if (game.state === 'over') restartGame();
     else if (game.paused) setPaused(false);
-    else game.drop();
+    else {
+      game.drop();
+      spaceHeldSince = performance.now();
+    }
   }
 });
-window.addEventListener('keyup', (e) => keys.delete(e.key));
+window.addEventListener('keyup', (e) => {
+  keys.delete(e.key);
+  if (e.key === ' ' || e.key === 'Enter') spaceHeldSince = null;
+});
 
-function applyKeys() {
+function applyKeys(now) {
   if (!canAim()) return;
   if (keys.has('ArrowLeft')) game.moveTo(game.aimX - 6);
   if (keys.has('ArrowRight')) game.moveTo(game.aimX + 6);
+  // 長按連續投放：實際間隔由 game 的 DROP_COOLDOWN 控制
+  const keyRepeat = spaceHeldSince !== null && now - spaceHeldSince >= GAME.HOLD_DELAY;
+  if (hold.shouldRepeat(now) || keyRepeat) game.drop();
 }
 
 // 切到背景自動暫停；回來時維持暫停，等玩家按「繼續」
@@ -120,8 +147,12 @@ document.addEventListener('visibilitychange', () => {
 
 function setPaused(paused) {
   if (game.state !== 'playing') return;
-  if (paused) game.pause();
-  else game.resume();
+  if (paused) {
+    game.pause();
+    stopHolding();
+  } else {
+    game.resume();
+  }
   ui.pause.hidden = !paused;
   ui.pauseBtn.textContent = paused ? '▶' : '❚❚';
   ui.pauseBtn.setAttribute('aria-label', paused ? '繼續' : '暫停');
@@ -149,6 +180,7 @@ function startGame() {
 }
 
 function restartGame() {
+  stopHolding();
   game.restart();
   effects.clear();
   ui.over.hidden = true;
@@ -188,6 +220,7 @@ game.on('gameover', ({ score, best, maxTier }) => {
   bestAtRoundStart = best;
   ui.pauseBtn.disabled = true;
   ui.over.hidden = false;
+  stopHolding();
   audio.gameover();
 });
 
@@ -252,7 +285,7 @@ let last = performance.now();
 function frame(now) {
   const dt = now - last;
   last = now;
-  applyKeys();
+  applyKeys(now);
   game.step(dt); // game 內部自己限制單次最多 MAX_FRAME_DT
   if (!game.paused) effects.update(Math.min(dt, 100));
   renderer.draw(game, now, effects);
