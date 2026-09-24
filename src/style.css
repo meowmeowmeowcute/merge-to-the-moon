@@ -61,6 +61,7 @@ html, body {
 
 .hud-label { font-size: 12px; color: var(--ink-dim); }
 .hud-value { font-size: 20px; line-height: 1.1; }
+.hud-level { color: #ff8a5c; }
 .hud-btn {
   flex: 0 0 auto;
   width: 48px;

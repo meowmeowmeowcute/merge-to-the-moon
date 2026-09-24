@@ -17,6 +17,7 @@ const canvas = $('game');
 const stage = $('stage');
 const ui = {
   score: $('score'),
+  level: $('level'),
   best: $('best'),
   pauseBtn: $('btn-pause'),
   muteBtn: $('btn-mute'),
@@ -171,6 +172,10 @@ game.on('moon', () => {
   effects.moon();
   audio.moon();
 });
+game.on('levelup', ({ level }) => {
+  effects.levelUp(level);
+  audio.levelUp();
+});
 game.on('gameover', ({ score, best, maxTier }) => {
   lastResult = { score, maxTier };
   ui.overScore.textContent = score;
@@ -239,6 +244,7 @@ $('btn-share').addEventListener('click', share);
 
 function updateHud() {
   ui.score.textContent = game.score;
+  ui.level.textContent = `Lv.${game.level + 1}`;
   ui.best.textContent = game.best;
 }
 

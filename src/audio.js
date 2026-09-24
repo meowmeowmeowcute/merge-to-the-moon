@@ -48,6 +48,9 @@ export function createAudio(storage) {
     moon() {
       [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.3, { type: 'triangle', gain: 0.08, when: i * 0.1 }));
     },
+    levelUp() {
+      [392, 523, 659].forEach((f, i) => tone(f, 0.14, { gain: 0.05, when: i * 0.07 }));
+    },
     gameover() {
       [392, 330, 262, 196].forEach((f, i) => tone(f, 0.24, { type: 'triangle', gain: 0.07, when: i * 0.17 }));
     },

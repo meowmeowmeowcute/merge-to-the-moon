@@ -13,8 +13,13 @@ export function createEffects() {
   const pops = new Map(); // body.id → 開始時間
   let time = 0;
   let flash = 0;
-  let banner = 0;
   let shake = 0;
+  // 橫幅佇列：同時觸發（例如合成月亮又升級）時依序顯示
+  const banners = [];
+
+  function announce(text, { duration = 1600, size = 32, color = '#f0b43c' } = {}) {
+    banners.push({ text, duration, size, color, age: 0 });
+  }
 
   function merge({ toTier, x, y, gained, body }) {
     const { radius: R, palette } = tierInfo(toTier);
@@ -41,8 +46,8 @@ export function createEffects() {
 
   function moon() {
     flash = 700;
-    banner = 2600;
     shake = 450;
+    announce('花好月圓！', { duration: 2600, size: 44 });
     for (let i = 0; i < 44; i++) {
       starRain.push({
         x: Math.random() * GAME.WIDTH,
@@ -70,8 +75,11 @@ export function createEffects() {
     for (const s of starRain) s.y += s.vy * dt;
     for (const [id, start] of pops) if (time - start > POP_MS) pops.delete(id);
     flash = Math.max(0, flash - dt);
-    banner = Math.max(0, banner - dt);
     shake = Math.max(0, shake - dt);
+    if (banners.length) {
+      banners[0].age += dt;
+      if (banners[0].age >= banners[0].duration) banners.shift();
+    }
   }
 
   /** 新物件的視覺縮放：0.6 → 1.1 → 1.0（物理半徑不變）。 */
@@ -136,26 +144,32 @@ export function createEffects() {
       ctx.fillRect(x - s.size, y, s.size * 3, s.size);
       ctx.fillRect(x, y - s.size, s.size, s.size * 3);
     }
-    if (banner > 0) {
-      const shown = 2600 - banner;
-      const fadeIn = Math.min(1, shown / 250);
-      const fadeOut = Math.min(1, banner / 400);
-      const bounce = shown < 300 ? 1 + 0.25 * Math.sin((shown / 300) * Math.PI) : 1;
+    const b = banners[0];
+    if (b) {
+      const left = b.duration - b.age;
+      const fadeIn = Math.min(1, b.age / 250);
+      const fadeOut = Math.min(1, left / 400);
+      const bounce = b.age < 300 ? 1 + 0.25 * Math.sin((b.age / 300) * Math.PI) : 1;
       ctx.globalAlpha = fadeIn * fadeOut;
       ctx.save();
-      ctx.translate(GAME.WIDTH / 2, 250);
+      ctx.translate(GAME.WIDTH / 2, 280);
       ctx.scale(bounce, bounce);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `44px ${FONT}`;
-      ctx.lineWidth = 8;
+      ctx.font = `${b.size}px ${FONT}`;
+      ctx.lineWidth = b.size / 5.5;
       ctx.strokeStyle = '#3a200d';
-      ctx.strokeText('花好月圓！', 0, 0);
-      ctx.fillStyle = '#f0b43c';
-      ctx.fillText('花好月圓！', 0, 0);
+      ctx.strokeText(b.text, 0, 0);
+      ctx.fillStyle = b.color;
+      ctx.fillText(b.text, 0, 0);
       ctx.restore();
     }
     ctx.globalAlpha = 1;
+  }
+
+  function levelUp(level) {
+    announce(`難度提升！Lv.${level + 1}`, { color: '#ff8a5c' });
+    shake = Math.max(shake, 160);
   }
 
   function clear() {
@@ -164,10 +178,10 @@ export function createEffects() {
     texts = [];
     starRain = [];
     pops.clear();
+    banners.length = 0;
     flash = 0;
-    banner = 0;
     shake = 0;
   }
 
-  return { merge, moon, update, popScale, shakeOffset, drawWorldEffects, drawOverlayEffects, clear };
+  return { merge, moon, levelUp, update, popScale, shakeOffset, drawWorldEffects, drawOverlayEffects, clear };
 }

@@ -114,12 +114,12 @@ function makeOg() {
   // 大月亮（含光暈）
   for (let r = 300; r > 230; r -= 14) {
     for (let a = 0; a < 360; a += 2) {
-      const x = Math.round(880 + Math.cos((a * Math.PI) / 180) * r);
+      const x = Math.round(910 + Math.cos((a * Math.PI) / 180) * r);
       const y = Math.round(315 + Math.sin((a * Math.PI) / 180) * r);
       img.rect(x - 6, y - 6, 12, 12, '#fff1a8', 0.03);
     }
   }
-  drawSprite(img, MAX_TIER, 880, 315, 9);
+  drawSprite(img, MAX_TIER, 910, 315, 8);
 
   // 標題與一排月餅
   drawText(img, 'MERGE TO', 70, 110, 12, '#f0b43c', '#3a200d');
