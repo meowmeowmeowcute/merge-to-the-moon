@@ -1,6 +1,6 @@
 # SPEC：Merge to the Moon（月餅合成）
 
-> 版本：v1.4（提高難度：警戒線下移、物件放大、生成 1～5 階、難度隨分數上升）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
+> 版本：v1.5（投放冷卻縮短為 250ms、長按連續投放）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
 > 流程：Idea → **Spec** → AI 實作 → Review → 修改 Spec → 再實作。
 > 本文件描述的行為要能直接對應到測試（見第 7 節對照表）。行為有改動時，先改這份文件並另外 commit（`docs: update spec ...`）。
 
@@ -20,7 +20,7 @@
 | 代號 | 功能 | 說明 |
 |------|------|------|
 | F1 | 生成 | 每次隨機產生第 1～5 階物件（不預告下一個）；機率隨難度等級改變 |
-| F2 | 投放 | 左右移動後放開，物件從頂部落下；有冷卻時間 |
+| F2 | 投放 | 左右移動後放開，物件從頂部落下；有冷卻時間；**長按可連續投放** |
 | F3 | 物理 | 重力、碰撞、堆疊，由 Matter.js 模擬 |
 | F4 | 合成 | 同階物件接觸 → 合成高一階，新物件帶著慣性往上彈一下並推開周圍；可以連鎖合成；月亮是最高階 |
 | F5 | 特效 | 合成時有粒子、Pop、閃光圈、分數飄字；合成出月亮時有專屬慶祝 |
@@ -73,7 +73,9 @@
 | `RESTITUTION` | 0.1 | 彈性 |
 | `FRICTION` | 0.3 | 摩擦 |
 | `MAX_SPEED` | 20 | 每個 step 結束時，所有物件的速度大小上限 |
-| `DROP_COOLDOWN` | 500 | 投放冷卻（ms，模擬時間） |
+| `DROP_COOLDOWN` | 250 | 投放冷卻（ms，模擬時間）；v1.5 由 500 縮短 |
+| `HOLD_DELAY` | 400 | 按住多久（ms，真實時間）進入連續投放 |
+| `HOLD_MOVE_TOLERANCE` | 10 | 進入連續投放前，指標移動超過這個距離（CSS px）就視為拖曳瞄準 |
 | `DROP_GRACE` | 1500 | 剛投放物件豁免 Game Over 判定的時間（ms） |
 | `OVER_LINE_LIMIT` | 2000 | Lv.1 的超線容許時間（ms）；其他等級見 3.3 |
 | `SPAWN_WEIGHTS` | `{ 1: 0.35, 2: 0.25, 3: 0.2, 4: 0.12, 5: 0.08 }` | Lv.1 的生成機率（第 1～5 階）；等於 `LEVELS[0].weights` |
@@ -116,6 +118,7 @@
 | `storage.js` | `loadBest(storage) → number`、`saveBest(storage, value)`。key 是 `merge-to-the-moon:best`；storage 是 null 或丟錯時不能崩潰（load 回傳 0，save 靜默失敗） |
 | `game.js` | `createGame(Matter, { seed, storage }) → Game`，組合上述模組，是 UI 唯一需要呼叫的入口 |
 | `share.js` | `buildShareText({ score, maxTier }) → string`，產生分享文字（純函式） |
+| `hold.js` | `createHoldControl({ holdDelay, moveTolerance }) → { press(x, t), move(x, t), release(t) → boolean, shouldRepeat(t) → boolean, pressed, repeating }`：長按連續投放的狀態機（純函式，見 4.10） |
 
 ### 4.2 物件（Fruit body）
 
@@ -216,8 +219,14 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 
 ### 4.10 輸入
 
-- Pointer Events 統一處理滑鼠和觸控：在畫布上 `pointermove` / `pointerdown` → `moveTo`，`pointerup` → `drop`。
-- 鍵盤：← / → 每幀移動 6px（按住連續移動），Space 或 Enter 投放。
+- Pointer Events 統一處理滑鼠和觸控：在畫布上 `pointermove` / `pointerdown` → `moveTo`。
+- **投放與長按（`hold.js`）**：
+  - `press`：按下時記錄位置和時間。
+  - `move`：還沒進入連續模式時，若離按下位置超過 `HOLD_MOVE_TOLERANCE`，就標記為「拖曳瞄準」，這次按壓不會進入連續模式。
+  - `shouldRepeat(t)`：按住中、不是拖曳，而且 `t − 按下時間 ≥ HOLD_DELAY` → 進入連續模式並回傳 true；之後在放開前都回傳 true（即使手指移動，也會跟著瞄準繼續投放）。
+  - `release`：回傳「放開時是否要投放一次」＝ 這次按壓**沒有**進入連續模式；並重設狀態。`pointercancel` 只重設，不投放。
+  - 主迴圈每幀在 `shouldRepeat` 為 true 時呼叫 `drop()`，實際間隔由 `DROP_COOLDOWN` 決定。
+- 鍵盤：← / → 每幀移動 6px（按住連續移動）；Space 或 Enter 按下時投放一次，按住 ≥ `HOLD_DELAY` 後連續投放。
 - 畫布設定 `touch-action: none`；頁面禁止雙擊縮放和拉動回彈，避免誤觸捲動。
 - `visibilitychange` 切到背景時 `pause()`，回到前景時 `resume()`。
 - 主迴圈用 `requestAnimationFrame`，把兩幀的時間差傳給 `game.step(dt)`。
@@ -254,7 +263,8 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | AC9 | 每次合成都有粒子、Pop、閃光圈、飄字；月亮有專屬慶祝特效 | 手動 |
 | AC10 | 分數正確累加；最高分重新整理後還在；storage 無法使用時不會崩潰 | 自動測試 ＋ 手動 |
 | AC11 | 超線 ≥ 2s 判定 Game Over，< 2s 不會；剛投放的物件豁免 1.5s；`restart()` 後狀態全部歸零 | 自動測試 |
-| AC12 | 投放有 500ms 冷卻；投放 x 會 clamp 在牆內 | 自動測試 |
+| AC12 | 投放有 250ms 冷卻；投放 x 會 clamp 在牆內；持續投放時間隔等於冷卻時間 | 自動測試 |
+| AC18 | 點擊或拖曳後放開投放一次；按住不動 ≥ 0.4 秒進入連續投放，放開即停且不多投一顆；拖曳瞄準不會誤觸連續投放 | 自動測試 ＋ 手動 |
 | AC13 | 手機直式能完整遊玩（觸控投放、畫面不溢出、不誤觸捲動或縮放） | 手動（實機） |
 | AC14 | 分享在支援的裝置叫出系統分享，不支援時改成複製到剪貼簿 | 手動 |
 | AC15 | GitHub Pages 公開網址可以直接打開遊玩；CI 測試通過才部署 | 手動 ＋ CI |
@@ -286,6 +296,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | `physics.test.js` | AC3、AC7 | 重力落下、停在地板（誤差 ≤ 1px）、最大階高速落下不穿隧、大水平速度不穿牆、不同階疊放不重疊、靜止後速度 < ε |
 | `merge.test.js` | AC4～AC8 | 同階合成（id 移除、階 + 1、中點）、不同階不合成、三個同時接觸只合成一對、重複事件不重複合成、靜止相貼也合成、密集堆中合成時的速度上限和容器限制、速度平均＋向上彈跳加上限、推開範圍內的鄰居（方向正確、範圍外不動、不超速）、連鎖、月亮不合成加 moon 事件只觸發一次 |
 | `sprites.test.js` | 4.9 | 每階網格尺寸正確、不透明格不超出碰撞圓 1 格、圓內超過 1 格的地方不能透明、只使用 palette 內的索引、各階顆粒大小一致 |
+| `hold.test.js` | AC18 | 點擊、拖曳、長按、容許範圍內的抖動、連續模式中移動、放開後重設、pointercancel |
 | `share.test.js` | 4.12 | 分享文字包含分數和最高合成階名稱；沒有合成時的文字 |
 | `rules.test.js` | AC10～AC12、AC17 | 計分、最高分更新和保存、storage 丟錯不崩潰、超線 < 2s 或 ≥ 2s、投放豁免、restart 歸零、投放冷卻、aimX clamp、非 playing 時不能投放；`levelFor` 門檻、升級事件只發一次、升級後超線容許時間變短、restart 回到 Lv.1 |
 
