@@ -136,6 +136,8 @@ Merge to the Moon/
 │   ├── index.html
 │   ├── style.css
 │   ├── main.js              # 啟動、輸入、遊戲迴圈
+│   ├── audio.js             # WebAudio 音效與靜音
+│   ├── og.png / favicon.png # 由 scripts/make-images.mjs 產生
 │   ├── vendor/matter.min.js
 │   ├── game/
 │   │   ├── config.js        # 階級表、常數
@@ -145,6 +147,7 @@ Merge to the Moon/
 │   │   ├── merge.js         # 合成偵測與處理
 │   │   ├── rules.js         # 計分、Game Over 判定
 │   │   ├── storage.js       # localStorage（最高分）
+│   │   ├── share.js         # 分享文字
 │   │   └── game.js          # 組合以上模組，UI 唯一入口（狀態機、step、drop）
 │   └── render/
 │       ├── sprites.js       # 像素圖定義與快取
@@ -156,7 +159,12 @@ Merge to the Moon/
 │   ├── spawner.test.js
 │   ├── physics.test.js
 │   ├── merge.test.js
+│   ├── sprites.test.js
+│   ├── share.test.js
 │   └── rules.test.js
+├── scripts/
+│   ├── serve.mjs            # 本機靜態伺服器
+│   └── make-images.mjs      # 產生 og.png / favicon.png
 └── .github/workflows/deploy.yml
 ```
 

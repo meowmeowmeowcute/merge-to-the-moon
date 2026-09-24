@@ -61,8 +61,20 @@ html, body {
 
 .hud-label { font-size: 12px; color: var(--ink-dim); }
 .hud-value { font-size: 20px; line-height: 1.1; }
-.hud-next { flex: 0 0 auto; flex-direction: row; gap: 6px; padding: 4px 10px; }
-#next { width: 36px; height: 36px; image-rendering: pixelated; }
+.hud-btn {
+  flex: 0 0 auto;
+  width: 48px;
+  font: inherit;
+  font-size: 18px;
+  color: var(--ink);
+  background: #1d215a;
+  border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 0 0 2px #2e2a6a, 0 3px 0 var(--wood-dark);
+  cursor: pointer;
+}
+
+.hud-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 0 0 2px #2e2a6a; }
+.hud-btn:disabled { opacity: 0.4; cursor: default; }
 
 /* ---- 遊戲區 ---- */
 
@@ -125,6 +137,25 @@ h2.title { font-size: 32px; }
 
 .over-tier { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 14px; }
 #over-tier { width: 64px; height: 64px; image-rendering: pixelated; }
+#title-moon { width: 96px; height: 96px; image-rendering: pixelated; filter: drop-shadow(0 0 12px rgba(255, 241, 168, 0.5)); }
+.keys { font-size: 12px; opacity: 0.8; }
+.btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  font-size: 15px;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--wood-dark);
+  border: 3px solid var(--gold);
+}
+
+.toast[hidden] { display: none; }
 
 .pixel-btn {
   font: inherit;
@@ -137,6 +168,8 @@ h2.title { font-size: 32px; }
   margin-top: 6px;
   cursor: pointer;
 }
+
+.pixel-btn.secondary { background: #8fd0ff; box-shadow: inset -3px -3px 0 #4a8fc2, 0 4px 0 var(--wood-dark); }
 
 .pixel-btn:active { transform: translateY(3px); box-shadow: inset -3px -3px 0 var(--gold-dark), 0 1px 0 var(--wood-dark); }
 
