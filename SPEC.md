@@ -214,7 +214,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 - 文字：`我在「月餅合成」拿到 {score} 分，最高合成到「{name}」！一起來合成月亮 🌕`，加上頁面網址。
 - 有 `navigator.share` 時使用它；沒有或失敗（非使用者取消）時改用 `navigator.clipboard.writeText`，並提示「已複製分享文字」。
 - `index.html` 加上 `og:title`、`og:description`、`og:image`（像素月亮圖 `src/og.png`）、`twitter:card`，以及像素月亮 favicon。
-- `og.png` 和 `favicon.png` 由 `scripts/make-images.mjs` 依像素圖網格產生（不需要額外套件）。部署後 `og:image` 要改成絕對網址（P9）。
+- `og.png` 和 `favicon.png` 由 `scripts/make-images.mjs` 依像素圖網格產生（不需要額外套件）。`og:image` 和 `og:url` 使用絕對網址 `https://meowmeowmeowcute.github.io/merge-to-the-moon/`（P9）。
 
 ---
 
