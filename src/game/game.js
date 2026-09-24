@@ -1,10 +1,10 @@
 // 遊戲入口：狀態機、固定步長、投放、合成計分、Game Over（SPEC 4.3～4.8）。
-import { GAME, MAX_TIER, tierInfo } from './config.js';
+import { GAME, LEVELS, MAX_TIER, tierInfo } from './config.js';
 import { createRng } from './rng.js';
 import { createSpawner } from './spawner.js';
 import { createWorld } from './world.js';
 import { createMergeSystem } from './merge.js';
-import { nextOverTime, isGameOver } from './rules.js';
+import { nextOverTime, isGameOver, levelFor } from './rules.js';
 import { loadBest, saveBest } from './storage.js';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -31,6 +31,7 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     score: 0,
     best: loadBest(storage),
     maxTier: 0,
+    level: 0,
     overTime: 0,
     world,
 
@@ -92,7 +93,7 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     limitSpeeds();
     game.now += GAME.TIMESTEP;
     game.overTime = nextOverTime(game.overTime, world.fruits(), game.now);
-    if (isGameOver(game.overTime)) {
+    if (isGameOver(game.overTime, LEVELS[game.level].overLineLimit)) {
       game.state = 'over';
       emit('gameover', { score: game.score, best: game.best, maxTier: game.maxTier });
     }
@@ -110,6 +111,12 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     if (toTier === MAX_TIER && !moonSeen) {
       moonSeen = true;
       emit('moon', { x, y });
+    }
+    const level = levelFor(game.score);
+    if (level > game.level) {
+      game.level = level;
+      spawner.setWeights(LEVELS[level].weights);
+      emit('levelup', { level });
     }
   }
 
@@ -133,6 +140,7 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     game.now = 0;
     game.score = 0;
     game.maxTier = 0;
+    game.level = 0;
     game.overTime = 0;
     game.paused = false;
     accumulator = 0;

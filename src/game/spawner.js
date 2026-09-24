@@ -2,10 +2,16 @@
 import { GAME } from './config.js';
 
 export function createSpawner({ rng, weights = GAME.SPAWN_WEIGHTS }) {
-  const entries = Object.entries(weights)
-    .map(([tier, w]) => [Number(tier), w])
-    .filter(([, w]) => w > 0);
-  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+  let entries;
+  let total;
+
+  function setWeights(next) {
+    entries = Object.entries(next)
+      .map(([tier, w]) => [Number(tier), w])
+      .filter(([, w]) => w > 0);
+    total = entries.reduce((sum, [, w]) => sum + w, 0);
+  }
+  setWeights(weights);
 
   function roll() {
     let r = rng() * total;
@@ -19,6 +25,8 @@ export function createSpawner({ rng, weights = GAME.SPAWN_WEIGHTS }) {
   let upcoming = roll();
   return {
     peek: () => upcoming,
+    /** 只影響之後新擲出的結果；已擲出的「下一個」不變。 */
+    setWeights,
     next() {
       const tier = upcoming;
       upcoming = roll();
