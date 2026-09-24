@@ -1,6 +1,6 @@
 # SPEC：Merge to the Moon（月餅合成）
 
-> 版本：v1.3（P7：生成 1～4 階、移除下一個預覽、合成彈跳、特效／分享／暫停／音效細節）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
+> 版本：v1.4（提高難度：警戒線下移、物件放大、生成 1～5 階、難度隨分數上升）｜來源：[PROJECT_GOAL.md](PROJECT_GOAL.md)
 > 流程：Idea → **Spec** → AI 實作 → Review → 修改 Spec → 再實作。
 > 本文件描述的行為要能直接對應到測試（見第 7 節對照表）。行為有改動時，先改這份文件並另外 commit（`docs: update spec ...`）。
 
@@ -19,13 +19,14 @@
 
 | 代號 | 功能 | 說明 |
 |------|------|------|
-| F1 | 生成 | 每次隨機產生第 1～4 階物件（不預告下一個，增加隨機感） |
+| F1 | 生成 | 每次隨機產生第 1～5 階物件（不預告下一個）；機率隨難度等級改變 |
 | F2 | 投放 | 左右移動後放開，物件從頂部落下；有冷卻時間 |
 | F3 | 物理 | 重力、碰撞、堆疊，由 Matter.js 模擬 |
 | F4 | 合成 | 同階物件接觸 → 合成高一階，新物件帶著慣性往上彈一下並推開周圍；可以連鎖合成；月亮是最高階 |
 | F5 | 特效 | 合成時有粒子、Pop、閃光圈、分數飄字；合成出月亮時有專屬慶祝 |
 | F6 | 計分 | 合成時加分；最高分保存在瀏覽器 |
-| F7 | 結束 | 物件停在警戒線以上太久就 Game Over |
+| F7 | 結束 | 物件停在警戒線以上太久就 Game Over；容許時間隨難度等級縮短 |
+| F11 | 難度等級 | 分數越高等級越高（Lv.1～Lv.4），生成的物件越大、超線容錯越短 |
 | F8 | 再一局 | 不必重新整理頁面就能重開 |
 | F9 | 分享 | Web Share API，不支援時改成複製到剪貼簿；有 Open Graph 預覽 |
 | F10 | 行動裝置 | 觸控操作、RWD、直式優先 |
@@ -41,15 +42,17 @@
 
 | tier | id | name | radius | score |
 |------|----|------|--------|-------|
-| 1 | `sesame` | 芝麻 | 12 | 0 |
-| 2 | `lotus` | 蓮子 | 17 | 2 |
-| 3 | `yolk` | 蛋黃 | 24 | 4 |
-| 4 | `mungbean` | 綠豆椪 | 32 | 8 |
-| 5 | `yolkpastry` | 蛋黃酥 | 40 | 16 |
-| 6 | `snowskin` | 冰皮月餅 | 50 | 32 |
-| 7 | `cantonese` | 廣式月餅 | 62 | 64 |
-| 8 | `pomelo` | 柚子 | 76 | 128 |
-| 9 | `moon` | 月亮 | 92 | 500 |
+| 1 | `sesame` | 芝麻 | 14 | 0 |
+| 2 | `lotus` | 蓮子 | 20 | 2 |
+| 3 | `yolk` | 蛋黃 | 28 | 4 |
+| 4 | `mungbean` | 綠豆椪 | 37 | 8 |
+| 5 | `yolkpastry` | 蛋黃酥 | 46 | 16 |
+| 6 | `snowskin` | 冰皮月餅 | 58 | 32 |
+| 7 | `cantonese` | 廣式月餅 | 71 | 64 |
+| 8 | `pomelo` | 柚子 | 87 | 128 |
+| 9 | `moon` | 月亮 | 106 | 500 |
+
+> v1.4：半徑整體放大約 15%（原本 12…92），同樣數量的物件會更快堆滿。
 
 - `MAX_TIER = 9`，最後一階的 id 一定是 `moon`。
 - `radius` 必須嚴格遞增；`score` 是「合成出此階時」獲得的分數。
@@ -63,7 +66,7 @@
 | `HEIGHT` | 700 | 邏輯高度，地板上緣 y = 700 |
 | `WALL_THICKNESS` | 60 | 牆和地板的厚度，放在可視範圍外 |
 | `DROP_Y` | 60 | 投放時的物件圓心 y |
-| `DANGER_Y` | 120 | 警戒線 y |
+| `DANGER_Y` | 170 | 警戒線 y（v1.4 由 120 下移，可用高度變少） |
 | `TIMESTEP` | 1000 / 60 | 物理固定步長（ms） |
 | `MAX_FRAME_DT` | 250 | 單次 `step(dt)` 最多吃進的時間（防止卡頓後暴衝） |
 | `GRAVITY_Y` | 1 | `engine.gravity.y`（Matter 預設 scale） |
@@ -72,13 +75,27 @@
 | `MAX_SPEED` | 20 | 每個 step 結束時，所有物件的速度大小上限 |
 | `DROP_COOLDOWN` | 500 | 投放冷卻（ms，模擬時間） |
 | `DROP_GRACE` | 1500 | 剛投放物件豁免 Game Over 判定的時間（ms） |
-| `OVER_LINE_LIMIT` | 2000 | 超過警戒線多久判定 Game Over（ms） |
-| `SPAWN_WEIGHTS` | `{ 1: 0.4, 2: 0.3, 3: 0.2, 4: 0.1 }` | 生成機率（第 1～4 階，越小越常見） |
+| `OVER_LINE_LIMIT` | 2000 | Lv.1 的超線容許時間（ms）；其他等級見 3.3 |
+| `SPAWN_WEIGHTS` | `{ 1: 0.35, 2: 0.25, 3: 0.2, 4: 0.12, 5: 0.08 }` | Lv.1 的生成機率（第 1～5 階）；等於 `LEVELS[0].weights` |
 | `MERGE_POP` | 4 | 合成時新物件額外獲得的向上速度（px / step） |
 | `MERGE_PUSH` | 3 | 合成時推開周圍物件的最大速度（px / step），隨距離線性衰減 |
 | `MERGE_PUSH_RANGE` | 12 | 推開範圍：兩圓邊緣距離 ≤ 此值的物件會被推開（px） |
 
 所有時間都是**模擬時間**，由 `step()` 累加，不讀 `Date.now()`，所以測試可以重現。
+
+### 3.3 難度等級（`src/game/config.js` → `LEVELS`）
+
+`LEVELS` 陣列的每個元素：`{ minScore, overLineLimit, weights }`。目前等級 = `minScore ≤ score` 的最後一個索引（0 起算，UI 顯示為 Lv.1 起）。
+
+| 等級 | `minScore` | `overLineLimit` | `weights`（第 1/2/3/4/5 階） |
+|------|-----------|-----------------|------------------------------|
+| Lv.1 | 0 | 2000 | 0.35 / 0.25 / 0.20 / 0.12 / 0.08 |
+| Lv.2 | 200 | 1800 | 0.30 / 0.25 / 0.20 / 0.15 / 0.10 |
+| Lv.3 | 500 | 1500 | 0.25 / 0.24 / 0.21 / 0.17 / 0.13 |
+| Lv.4 | 1000 | 1200 | 0.20 / 0.22 / 0.22 / 0.20 / 0.16 |
+
+- `minScore` 從 0 開始且嚴格遞增；`overLineLimit` 不遞增；每組 `weights` 只有第 1～5 階且總和為 1；平均生成階數不遞減（越高等級生成越大）。
+- 等級只升不降（分數只會增加）；`restart()` 回到 Lv.1。
 
 ---
 
@@ -92,10 +109,10 @@
 | 模組 | 對外介面（契約） |
 |------|------------------|
 | `rng.js` | `createRng(seed: number) → () => number`，回傳 [0, 1)，相同 seed 產生相同序列（mulberry32） |
-| `spawner.js` | `createSpawner({ rng, weights = GAME.SPAWN_WEIGHTS }) → { peek(): tier, next(): tier }`。`peek` 看下一個但不消耗，`next` 取出並產生新的下一個 |
+| `spawner.js` | `createSpawner({ rng, weights = GAME.SPAWN_WEIGHTS }) → { peek(): tier, next(): tier, setWeights(weights) }`。`peek` 看下一個但不消耗，`next` 取出並產生新的下一個。`setWeights` 只影響之後新擲出的結果，已經擲出的「下一個」不變 |
 | `world.js` | `createWorld(Matter) → { engine, addFruit(tier, x, y, { bornAt }) → body, removeFruit(body), fruits(): body[], clear() }`。建立地板和左右牆（static），沒有天花板；`bornAt` 預設 0 |
 | `merge.js` | `createMergeSystem(Matter, world, { onMerge }) → { flush(now) }`。監聽 engine 的 `collisionStart` 和 `collisionActive`，把同階配對放進佇列；`flush` 在 `Engine.update` 之後處理佇列（移除、生成新物件），每合成一對呼叫一次 `onMerge({ fromTier, toTier, x, y, body })`（body 是新物件）。**計分和事件由 game 在 onMerge 裡處理**，merge.js 不管分數 |
-| `rules.js` | 計分和 Game Over 判定（純函式或小型狀態物件，不依賴 Matter） |
+| `rules.js` | Game Over 判定與難度等級（純函式，不依賴 Matter）：`isOverLine(body, now)`、`nextOverTime(...)`、`isGameOver(overTime, limit)`、`levelFor(score) → 等級索引` |
 | `storage.js` | `loadBest(storage) → number`、`saveBest(storage, value)`。key 是 `merge-to-the-moon:best`；storage 是 null 或丟錯時不能崩潰（load 回傳 0，save 靜默失敗） |
 | `game.js` | `createGame(Matter, { seed, storage }) → Game`，組合上述模組，是 UI 唯一需要呼叫的入口 |
 | `share.js` | `buildShareText({ score, maxTier }) → string`，產生分享文字（純函式） |
@@ -125,6 +142,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | `current` / `next` | 手上物件的階、下一個物件的階（`next` 只供內部與測試使用，**UI 不顯示**） |
 | `aimX` | 手上物件目前的 x（初始值是 WIDTH / 2） |
 | `score` / `best` / `maxTier` | 本局分數、最高分、本局達到的最高階（初始 0，投放和合成時更新為 max） |
+| `level` | 目前難度等級索引（0 = Lv.1） |
 | `now` | 目前模擬時間（ms） |
 | `overTime` | 目前連續超線的時間（ms），UI 用它來讓警戒線閃爍 |
 | `pause()` / `resume()` / `paused` | 暫停時 `step` 不推進 |
@@ -142,7 +160,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 
 ### 4.5 生成與投放
 
-- 生成器每次只產生 tier 1～4，機率依照 `SPAWN_WEIGHTS`。
+- 生成器每次只產生 tier 1～5，機率依照目前等級的 `LEVELS[level].weights`。
 - `drop()` 成功的條件：`state === 'playing'`、沒有暫停，而且 `now - lastDropAt ≥ DROP_COOLDOWN`（第一次投放不受冷卻限制）。
 - 成功時：在 `(aimX, DROP_Y)` 加入 `current` 階物件，`bornAt = now`；接著 `current = next`，`next = spawner.next()`；`aimX` 重新 clamp 到新 current 的半徑範圍；發出 `drop` 事件。
 - 失敗時（冷卻中、非 playing）：什麼都不做，回傳 null。
@@ -158,6 +176,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
    - 移除兩個舊物件，加入新物件（`bornAt` = 兩者中較早的那個，**不給**投放豁免）。
    - 呼叫 `onMerge`。game 收到後：分數 `+= TIERS[t-1].score`；`maxTier = max(maxTier, t)`；若 `score > best`，就更新 best 並 `saveBest`；
      發出 `merge` 事件；若 `t === MAX_TIER` 而且本局第一次出現月亮，再發出 `moon` 事件。
+     接著若 `levelFor(score) > level`：更新 `level`、`spawner.setWeights(LEVELS[level].weights)`，並發出 `levelup` 事件（一次跳多級時只發一次，帶最終等級）。
 3. **連鎖**：新物件在後續 substep 若接觸同階物件，照同樣規則繼續合成（不需要特別處理）。
 4. **月亮**：`tier === MAX_TIER` 的物件永遠不進合成佇列，兩顆月亮只會正常碰撞。
 5. **碰撞合理性**：合成出的大物件擠開周圍物件時，靠 4.4 的速度上限避免物件被彈飛；牆和地板保證物件不會離開容器。
@@ -166,7 +185,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 
 - 「超線物件」的條件：`body.position.y - radius < DANGER_Y`，而且 `now - body.bornAt ≥ DROP_GRACE`。
 - 只要有任何超線物件，`overTime += TIMESTEP`；沒有的話 `overTime = 0`。
-- `overTime ≥ OVER_LINE_LIMIT` → `state = 'over'`，發出 `gameover` 事件，之後 `step` 不再推進物理。
+- `overTime ≥ LEVELS[level].overLineLimit` → `state = 'over'`，發出 `gameover` 事件，之後 `step` 不再推進物理。
 
 ### 4.8 事件
 
@@ -175,6 +194,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | `drop` | `{ tier, x, y }` | 音效 |
 | `merge` | `{ fromTier, toTier, x, y, gained, score, body }` | 粒子、Pop（用 `body.id` 對應）、閃光圈、飄字、音效 |
 | `moon` | `{ x, y }` | 月亮慶祝特效 |
+| `levelup` | `{ level }` | 顯示「難度提升！」橫幅、音效、更新 HUD 等級 |
 | `gameover` | `{ score, best, maxTier }` | 顯示結算畫面 |
 
 ### 4.9 畫面與特效（render）
@@ -183,13 +203,14 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 - **像素圖**：每一階由 `buildSpriteGrid(tier)`（純函式）**以程式產生** palette 索引字串網格：圓形遮罩＋右下月牙陰影＋左上高光＋外框，再加上各階專屬裝飾（紅印、芝麻、花紋、花邊、葉子、坑洞…）。網格邊長 = `round(2r / 3.5)`（最小 7），讓各階的像素顆粒大小一致（每格約 3～4.5 邏輯 px）。網格在 offscreen canvas 預先繪製後快取；繪製時縮放到直徑 2r，並依 `body.angle` 旋轉。外形和碰撞圓的誤差不超過 1 格（由 `sprites.test.js` 驗證）。
   - 為什麼不手繪字串：9 張圖手刻工作量大，又很難保證外形貼合碰撞圓；程式產生的網格可以直接用測試驗證。
 - **場景**：像素夜空、星星、雲；容器像木盒；警戒線是虛線，`overTime > 0` 時閃紅。
-- **HUD**：用 DOM 放在畫布上方（分數、最高分、暫停鈕、靜音鈕），不佔用投放區；**不顯示下一個預覽**。手上物件和一條淡淡的投放導引線畫在 `aimX`。
+- **HUD**：用 DOM 放在畫布上方（分數、目前等級 `Lv.N`、最高分、暫停鈕、靜音鈕），不佔用投放區；**不顯示下一個預覽**。手上物件和一條淡淡的投放導引線畫在 `aimX`。
 - **合成特效**（由 `merge` 事件觸發，存活約 0.3～0.8 秒）：
   - 粒子：8～16 顆方形像素，顏色取自新階 palette，向外噴散並受重力影響。
   - Pop：新物件的**視覺**縮放 0.6 → 1.1 → 1.0（約 200ms），物理半徑不變。
   - 閃光圈：白色像素環擴散後淡出。
   - 飄字：`+gained` 往上飄並淡出。
 - **月亮特效**（`moon` 事件）：全螢幕金光閃爍、星星雨約 2 秒、輕微震動，並顯示「花好月圓！」；遊戲繼續。
+- **升級提示**（`levelup` 事件）：畫面中央跳出「難度提升！Lv.N」橫幅約 1.6 秒，並播放上升音效。
 - 特效只讀事件，不影響物理，也不影響測試結果；使用真實時間，暫停時凍結。
 - 震動只移動畫面繪製的偏移量，不影響輸入座標換算。
 
@@ -223,7 +244,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | AC | 驗收條件 | 驗證方式 |
 |----|----------|----------|
 | AC1 | 階級表 ≥ 9 階（≥ 8 次合成），半徑嚴格遞增，最後一階是 `moon` | 自動測試 |
-| AC2 | 生成只會出現第 1～4 階，四種都會出現；相同 seed 產生相同序列；UI 不顯示下一個 | 自動測試 ＋ 手動 |
+| AC2 | 生成只會出現第 1～5 階，五種都會出現；相同 seed 產生相同序列；UI 不顯示下一個 | 自動測試 ＋ 手動 |
 | AC3 | 物件受重力落下，停在地板或其他物件上，不會穿透地板或牆壁 | 自動測試 |
 | AC4 | 兩個同階物件接觸後，在同一個 substep 內合成一個高一階物件，位置在兩者中點（經 clamp）；新物件速度 = 平均速度 ＋ 向上彈跳，周圍物件被推開 | 自動測試 |
 | AC5 | 不同階物件接觸不會合成 | 自動測試 |
@@ -238,6 +259,7 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 | AC14 | 分享在支援的裝置叫出系統分享，不支援時改成複製到剪貼簿 | 手動 |
 | AC15 | GitHub Pages 公開網址可以直接打開遊玩；CI 測試通過才部署 | 手動 ＋ CI |
 | AC16 | 暫停鈕可暫停和繼續；靜音設定重新整理後還在 | 手動 |
+| AC17 | 分數達到門檻時升級（只發一次 `levelup`）、生成機率切換、超線容許時間縮短；restart 回到 Lv.1 | 自動測試 ＋ 手動 |
 
 ---
 
@@ -259,12 +281,12 @@ state: 'ready' ──start()──▶ 'playing' ──(超線 ≥ 2s)──▶ '
 
 | 測試檔 | 涵蓋 AC | 重點案例 |
 |--------|---------|----------|
-| `config.test.js` | AC1 | 長度 ≥ 9、半徑嚴格遞增、最後一階是 moon、tier 欄位等於索引 + 1 |
-| `spawner.test.js` | AC2 | 1000 次只出現 {1～4} 而且四種都有、第 1 階最多；同 seed 同序列；`peek` 不消耗 |
+| `config.test.js` | AC1、AC17 | 長度 ≥ 9、半徑嚴格遞增、最後一階是 moon、tier 欄位等於索引 + 1；`LEVELS` 門檻遞增、容許時間不遞增、權重合法且平均階數不遞減 |
+| `spawner.test.js` | AC2 | 1000 次只出現 {1～5} 而且五種都有、階數越小越常見；同 seed 同序列；`peek` 不消耗；`setWeights` 不改變已擲出的下一個 |
 | `physics.test.js` | AC3、AC7 | 重力落下、停在地板（誤差 ≤ 1px）、最大階高速落下不穿隧、大水平速度不穿牆、不同階疊放不重疊、靜止後速度 < ε |
 | `merge.test.js` | AC4～AC8 | 同階合成（id 移除、階 + 1、中點）、不同階不合成、三個同時接觸只合成一對、重複事件不重複合成、靜止相貼也合成、密集堆中合成時的速度上限和容器限制、速度平均＋向上彈跳加上限、推開範圍內的鄰居（方向正確、範圍外不動、不超速）、連鎖、月亮不合成加 moon 事件只觸發一次 |
 | `sprites.test.js` | 4.9 | 每階網格尺寸正確、不透明格不超出碰撞圓 1 格、圓內超過 1 格的地方不能透明、只使用 palette 內的索引、各階顆粒大小一致 |
 | `share.test.js` | 4.12 | 分享文字包含分數和最高合成階名稱；沒有合成時的文字 |
-| `rules.test.js` | AC10～AC12 | 計分、最高分更新和保存、storage 丟錯不崩潰、超線 < 2s 或 ≥ 2s、投放豁免、restart 歸零、投放冷卻、aimX clamp、非 playing 時不能投放 |
+| `rules.test.js` | AC10～AC12、AC17 | 計分、最高分更新和保存、storage 丟錯不崩潰、超線 < 2s 或 ≥ 2s、投放豁免、restart 歸零、投放冷卻、aimX clamp、非 playing 時不能投放；`levelFor` 門檻、升級事件只發一次、升級後超線容許時間變短、restart 回到 Lv.1 |
 
 **容差約定**：位置 ±1px（靜止判定）或 ±2px（合成中點）；重疊判定：圓心距離 ≥ r1 + r2 − 1.5；靜止：所有物件的 `|v| < 0.05`，並持續 30 個 substep。
