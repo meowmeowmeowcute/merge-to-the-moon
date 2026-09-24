@@ -132,7 +132,7 @@ test('onMerge payload 與新物件屬性：中點、bornAt 取較早者、mergin
   assert.equal(m.body.merging, false);
 });
 
-test('新物件速度 = 兩者平均', () => {
+test('新物件速度 = 兩者平均（慣性）＋ 向上 MERGE_POP', () => {
   const { world, merge, merges, fire } = rig();
   const a = world.addFruit(3, 190, 300);
   const b = world.addFruit(3, 210, 300);
@@ -141,7 +141,7 @@ test('新物件速度 = 兩者平均', () => {
   fire('collisionStart', [[a, b]]);
   merge.flush(0);
   const v = merges[0].body.velocity;
-  assert.ok(Math.abs(v.x - 2) < 1e-6 && Math.abs(v.y + 1) < 1e-6, `v=(${v.x}, ${v.y})`);
+  assert.ok(Math.abs(v.x - 2) < 1e-6 && Math.abs(v.y - (-1 - GAME.MERGE_POP)) < 1e-6, `v=(${v.x}, ${v.y})`);
 });
 
 test('新物件速度被限制在 MAX_SPEED', () => {
@@ -172,6 +172,60 @@ test('合成位置會 clamp 在牆內與地板上', () => {
   assert.ok(Math.abs(left.position.x - R) < 1e-6, `x=${left.position.x}`);
   assert.ok(Math.abs(low.position.y - (GAME.HEIGHT - R)) < 1e-6, `y=${low.position.y}`);
   assert.ok(low.position.x <= GAME.WIDTH - R + 1e-6);
+});
+
+// ---- 合成彈跳：推開周圍物件 ----
+
+test('合成時推開範圍內的鄰居：方向朝外、範圍外不受影響', () => {
+  const { world, merge, fire } = rig();
+  const a = world.addFruit(3, 190, 300);
+  const b = world.addFruit(3, 210, 300);
+  // 新物件是第 4 階（R = 32），圓心 (200, 300)
+  const right = world.addFruit(1, 200 + 32 + 12 + 6, 300); // gap = 6 → 推力一半
+  const above = world.addFruit(2, 200, 300 - 32 - 17 - 2); // gap = 2
+  const touching = world.addFruit(1, 200 - 32 - 12 + 4, 300); // 重疊 4px → 全力推
+  const far = world.addFruit(1, 360, 300); // gap = 104 → 不受影響
+  fire('collisionStart', [[a, b]]);
+  merge.flush(0);
+
+  assert.ok(right.velocity.x > 0 && Math.abs(right.velocity.y) < 1e-6, `右邊 v=(${right.velocity.x}, ${right.velocity.y})`);
+  assert.ok(Math.abs(right.velocity.x - GAME.MERGE_PUSH * 0.5) < 1e-6);
+  assert.ok(above.velocity.y < 0 && Math.abs(above.velocity.x) < 1e-6, '上方的鄰居要往上推');
+  assert.ok(touching.velocity.x < 0);
+  assert.ok(Math.abs(touching.velocity.x + GAME.MERGE_PUSH) < 1e-6, '重疊時用全力推');
+  assert.equal(speedOf(far), 0, '範圍外不應被推');
+});
+
+test('推開後的鄰居速度不超過 MAX_SPEED', () => {
+  const { world, merge, fire } = rig();
+  const a = world.addFruit(3, 190, 300);
+  const b = world.addFruit(3, 210, 300);
+  const n = world.addFruit(1, 250, 300);
+  Matter.Body.setVelocity(n, { x: GAME.MAX_SPEED - 0.5, y: 0 });
+  fire('collisionStart', [[a, b]]);
+  merge.flush(0);
+  assert.ok(speedOf(n) <= GAME.MAX_SPEED + 1e-6, `速度 ${speedOf(n)}`);
+});
+
+test('合成的兩個舊物件不會被當成鄰居推開（已移除）', () => {
+  const { world, merge, merges, fire } = rig();
+  const a = world.addFruit(3, 190, 300);
+  const b = world.addFruit(3, 210, 300);
+  fire('collisionStart', [[a, b]]);
+  merge.flush(0);
+  assert.deepEqual(world.fruits(), [merges[0].body]);
+});
+
+test('合成後新物件在真實物理中會先往上彈', () => {
+  const game = newGame();
+  game.world.addFruit(3, 176.5, 676);
+  game.world.addFruit(3, 223.5, 676);
+  substeps(game, 1);
+  const n = game.fruits()[0];
+  const y0 = n.position.y;
+  let minY = y0;
+  substeps(game, 20, () => { minY = Math.min(minY, n.position.y); });
+  assert.ok(minY < y0 - 3, `沒有往上彈：y0=${y0.toFixed(2)} minY=${minY.toFixed(2)}`);
 });
 
 // ---- 合成過程中和其他物件的碰撞合理性 ----
@@ -214,7 +268,8 @@ test('連鎖合成：新物件接觸同階物件會繼續合成', () => {
   game.world.addFruit(2, 216, 400);
   game.world.addFruit(3, 200, 440);
   const ev = recordEvents(game);
-  substeps(game, 10);
+  // 合成彈跳會讓兩者先稍微分開，重力會再讓它們碰在一起
+  substeps(game, 60);
   assert.deepEqual(tiersOf(game), [4]);
   assert.deepEqual(ev.merge.map((m) => m.toTier), [3, 4]);
 });

@@ -90,7 +90,7 @@ test('投放在 (aimX, DROP_Y) 加入 current 階物件，接著換成 next', ()
   assert.equal(b.position.x, 150);
   assert.equal(b.position.y, GAME.DROP_Y);
   assert.equal(game.current, next);
-  assert.ok([1, 2].includes(game.next));
+  assert.ok([1, 2, 3, 4].includes(game.next));
   assert.deepEqual(drops, [{ tier: current, x: 150, y: GAME.DROP_Y }]);
   assert.equal(game.maxTier, current);
 });
@@ -142,6 +142,7 @@ test('merge 事件帶 gained 與累計 score', () => {
   assert.equal(events.length, 1);
   assert.equal(events[0].gained, TIERS[3].score);
   assert.equal(events[0].score, game.score);
+  assert.equal(events[0].body, game.fruits()[0], 'merge 事件要帶新物件 body');
 });
 
 test('分數超過最高分時更新 best 並寫入 storage', () => {
@@ -240,7 +241,7 @@ test('restart 後狀態歸零，保留最高分', () => {
   assert.equal(game.maxTier, 0);
   assert.equal(game.overTime, 0);
   assert.equal(game.best, best);
-  assert.ok([1, 2].includes(game.current) && [1, 2].includes(game.next));
+  assert.ok([1, 2, 3, 4].includes(game.current) && [1, 2, 3, 4].includes(game.next));
   assert.ok(game.drop(), 'restart 後可以立即投放');
   substeps(game, stepsFor(GAME.OVER_LINE_LIMIT) + 10);
   assert.equal(game.state, 'playing', '舊的超線狀態不應延續');

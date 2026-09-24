@@ -39,9 +39,9 @@ test('每階都有名稱、分數與 palette；第 1 階分數為 0、其餘遞�
   for (let i = 2; i < TIERS.length; i++) assert.ok(TIERS[i].score > TIERS[i - 1].score);
 });
 
-test('生成權重只包含第 1、2 階且總和為 1', () => {
+test('生成權重只包含第 1～4 階且總和為 1', () => {
   const keys = Object.keys(GAME.SPAWN_WEIGHTS).map(Number).sort();
-  assert.deepEqual(keys, [1, 2]);
+  assert.deepEqual(keys, [1, 2, 3, 4]);
   const sum = Object.values(GAME.SPAWN_WEIGHTS).reduce((a, b) => a + b, 0);
   assert.ok(Math.abs(sum - 1) < 1e-9);
 });
@@ -55,6 +55,9 @@ test('SPEC 3.2 常數', () => {
   assert.equal(GAME.DROP_GRACE, 1500);
   assert.equal(GAME.OVER_LINE_LIMIT, 2000);
   assert.equal(GAME.MAX_SPEED, 20);
+  assert.equal(GAME.MERGE_POP, 4);
+  assert.equal(GAME.MERGE_PUSH, 3);
+  assert.equal(GAME.MERGE_PUSH_RANGE, 12);
   // 防穿隧前提：單步最大位移小於牆厚
   assert.ok(GAME.MAX_SPEED < GAME.WALL_THICKNESS);
 });
