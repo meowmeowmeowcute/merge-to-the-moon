@@ -1,4 +1,4 @@
-// Canvas 繪製：夜空背景、警戒線、手上物件與導引線、所有 fruit（SPEC 4.9）。
+// Canvas 繪製：夜空背景、警戒線、手上物件與導引線、所有 fruit、特效（SPEC 4.9）。
 // 只讀取 game 狀態，不修改物理。
 import { GAME, MAX_TIER, tierInfo } from '../game/config.js';
 import { createRng } from '../game/rng.js';
@@ -45,9 +45,12 @@ export function createRenderer(canvas, sprites) {
 
   function drawBackground(t) {
     const bandH = GAME.HEIGHT / SKY_BANDS.length;
+    // 往外多畫 8px，震動時邊緣不會露出底色
     SKY_BANDS.forEach((color, i) => {
+      const top = i === 0 ? -8 : Math.floor(i * bandH);
+      const bottom = i === SKY_BANDS.length - 1 ? GAME.HEIGHT + 8 : Math.floor((i + 1) * bandH) + 1;
       ctx.fillStyle = color;
-      ctx.fillRect(0, Math.floor(i * bandH), GAME.WIDTH, Math.ceil(bandH) + 1);
+      ctx.fillRect(-8, top, GAME.WIDTH + 16, bottom - top);
     });
     for (const s of stars) {
       ctx.globalAlpha = 0.45 + 0.4 * Math.sin(t * 0.002 + s.phase);
@@ -82,7 +85,7 @@ export function createRenderer(canvas, sprites) {
     drawSprite(game.current, game.aimX, GAME.DROP_Y);
   }
 
-  function drawFruits(game) {
+  function drawFruits(game, effects) {
     for (const body of game.fruits()) {
       const { x, y } = body.position;
       if (body.tier === MAX_TIER) {
@@ -91,23 +94,27 @@ export function createRenderer(canvas, sprites) {
         ctx.arc(x, y, tierInfo(MAX_TIER).radius + 10, 0, Math.PI * 2);
         ctx.fill();
       }
-      drawSprite(body.tier, x, y, body.angle);
+      drawSprite(body.tier, x, y, body.angle, effects ? effects.popScale(body.id) : 1);
     }
   }
 
-  function draw(game, t) {
-    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  function draw(game, t, effects) {
+    const shake = effects ? effects.shakeOffset() : { x: 0, y: 0 };
+    ctx.setTransform(scale, 0, 0, scale, shake.x * scale, shake.y * scale);
     ctx.imageSmoothingEnabled = false;
     drawBackground(t);
     drawDangerLine(game, t);
-    drawFruits(game);
+    drawFruits(game, effects);
+    effects?.drawWorldEffects(ctx);
     drawAim(game);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    effects?.drawOverlayEffects(ctx);
   }
 
   return { resize, draw, drawSprite };
 }
 
-/** 在小畫布上畫單一物件（HUD 的「下一個」、結算畫面）。 */
+/** 在小畫布上畫單一物件（結算畫面、標題）。 */
 export function drawSpriteInto(canvas, sprite) {
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false;
