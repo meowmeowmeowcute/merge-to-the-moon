@@ -1,9 +1,9 @@
 // 遊戲入口：狀態機、固定步長、投放（SPEC 4.3～4.5）。
-// P3：物理與投放；合成（P4）、計分與 Game Over（P5）之後接上。
-import { GAME, tierInfo } from './config.js';
+import { GAME, MAX_TIER, tierInfo } from './config.js';
 import { createRng } from './rng.js';
 import { createSpawner } from './spawner.js';
 import { createWorld } from './world.js';
+import { createMergeSystem } from './merge.js';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -15,6 +15,9 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
   let spawner;
   let accumulator;
   let lastDropAt;
+  let moonSeen;
+
+  const merge = createMergeSystem(Matter, world, { onMerge: handleMerge });
 
   const game = {
     state: 'ready',
@@ -83,8 +86,20 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
 
   function substep() {
     Matter.Engine.update(world.engine, GAME.TIMESTEP);
+    merge.flush(game.now);
     limitSpeeds();
     game.now += GAME.TIMESTEP;
+  }
+
+  function handleMerge({ fromTier, toTier, x, y }) {
+    const gained = tierInfo(toTier).score;
+    game.score += gained;
+    game.maxTier = Math.max(game.maxTier, toTier);
+    emit('merge', { fromTier, toTier, x, y, gained, score: game.score });
+    if (toTier === MAX_TIER && !moonSeen) {
+      moonSeen = true;
+      emit('moon', { x, y });
+    }
   }
 
   function limitSpeeds() {
@@ -111,6 +126,7 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     game.paused = false;
     accumulator = 0;
     lastDropAt = null;
+    moonSeen = false;
   }
 
   resetRound();

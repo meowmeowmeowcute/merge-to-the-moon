@@ -52,10 +52,11 @@ test('兩個同階物件接觸後，在同一個 substep 內合成高一階，�
 
 test('同階物件從兩側滑向彼此也會合成', () => {
   const game = newGame();
-  const a = game.world.addFruit(3, 120, 676);
-  const b = game.world.addFruit(3, 280, 676);
-  Matter.Body.setVelocity(a, { x: 3, y: 0 });
-  Matter.Body.setVelocity(b, { x: -3, y: 0 });
+  // 地面摩擦＋空氣阻力會很快吃掉速度，起點要夠近、初速要夠大（見 ai-incidents #4）
+  const a = game.world.addFruit(3, 150, 676);
+  const b = game.world.addFruit(3, 250, 676);
+  Matter.Body.setVelocity(a, { x: 6, y: 0 });
+  Matter.Body.setVelocity(b, { x: -6, y: 0 });
   substeps(game, 180);
   assert.deepEqual(tiersOf(game), [4]);
 });
