@@ -53,8 +53,9 @@ test('兩個同階物件接觸後，在同一個 substep 內合成高一階，�
 test('同階物件從兩側滑向彼此也會合成', () => {
   const game = newGame();
   // 地面摩擦＋空氣阻力會很快吃掉速度，起點要夠近、初速要夠大（見 ai-incidents #4）
-  const a = game.world.addFruit(3, 150, 676);
-  const b = game.world.addFruit(3, 250, 676);
+  const floorY = GAME.HEIGHT - radiusOf(3);
+  const a = game.world.addFruit(3, 150, floorY);
+  const b = game.world.addFruit(3, 250, floorY);
   Matter.Body.setVelocity(a, { x: 6, y: 0 });
   Matter.Body.setVelocity(b, { x: -6, y: 0 });
   substeps(game, 180);
@@ -180,10 +181,11 @@ test('合成時推開範圍內的鄰居：方向朝外、範圍外不受影響',
   const { world, merge, fire } = rig();
   const a = world.addFruit(3, 190, 300);
   const b = world.addFruit(3, 210, 300);
-  // 新物件是第 4 階（R = 32），圓心 (200, 300)
-  const right = world.addFruit(1, 200 + 32 + 12 + 6, 300); // gap = 6 → 推力一半
-  const above = world.addFruit(2, 200, 300 - 32 - 17 - 2); // gap = 2
-  const touching = world.addFruit(1, 200 - 32 - 12 + 4, 300); // 重疊 4px → 全力推
+  // 新物件是第 4 階，圓心 (200, 300)
+  const R = radiusOf(4);
+  const right = world.addFruit(1, 200 + R + radiusOf(1) + 6, 300); // gap = 6 → 推力一半
+  const above = world.addFruit(2, 200, 300 - R - radiusOf(2) - 2); // gap = 2
+  const touching = world.addFruit(1, 200 - R - radiusOf(1) + 4, 300); // 重疊 4px → 全力推
   const far = world.addFruit(1, 360, 300); // gap = 104 → 不受影響
   fire('collisionStart', [[a, b]]);
   merge.flush(0);
@@ -218,8 +220,9 @@ test('合成的兩個舊物件不會被當成鄰居推開（已移除）', () =>
 
 test('合成後新物件在真實物理中會先往上彈', () => {
   const game = newGame();
-  game.world.addFruit(3, 176.5, 676);
-  game.world.addFruit(3, 223.5, 676);
+  const floorY = GAME.HEIGHT - radiusOf(3);
+  game.world.addFruit(3, 200 - radiusOf(3) * 0.85, floorY);
+  game.world.addFruit(3, 200 + radiusOf(3) * 0.85, floorY);
   substeps(game, 1);
   const n = game.fruits()[0];
   const y0 = n.position.y;
@@ -264,12 +267,15 @@ test('密集堆中合成出大物件：鄰居不被彈飛、不離開容器，�
 
 test('連鎖合成：新物件接觸同階物件會繼續合成', () => {
   const game = newGame();
-  game.world.addFruit(2, 184, 400);
-  game.world.addFruit(2, 216, 400);
-  game.world.addFruit(3, 200, 440);
+  const r2 = radiusOf(2);
+  const r3 = radiusOf(3);
+  game.world.addFruit(2, 200 - r2 * 0.8, 400);
+  game.world.addFruit(2, 200 + r2 * 0.8, 400);
+  // 下方的第 3 階：一開始不碰到兩個第 2 階，但會碰到它們合成出的第 3 階
+  game.world.addFruit(3, 200, 400 + 2 * r3 - 4);
   const ev = recordEvents(game);
   // 合成彈跳會讓兩者先稍微分開，重力會再讓它們碰在一起
-  substeps(game, 60);
+  substeps(game, 120);
   assert.deepEqual(tiersOf(game), [4]);
   assert.deepEqual(ev.merge.map((m) => m.toTier), [3, 4]);
 });

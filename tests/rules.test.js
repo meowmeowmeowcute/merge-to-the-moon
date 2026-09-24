@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGame } from '../src/game/game.js';
 import { loadBest, saveBest } from '../src/game/storage.js';
+import { levelFor } from '../src/game/rules.js';
+import { LEVELS } from '../src/game/config.js';
 import {
   Matter, GAME, TIERS, radiusOf, newGame, substeps, mockStorage, throwingStorage, pin,
 } from './helpers.js';
@@ -90,7 +92,7 @@ test('投放在 (aimX, DROP_Y) 加入 current 階物件，接著換成 next', ()
   assert.equal(b.position.x, 150);
   assert.equal(b.position.y, GAME.DROP_Y);
   assert.equal(game.current, next);
-  assert.ok([1, 2, 3, 4].includes(game.next));
+  assert.ok([1, 2, 3, 4, 5].includes(game.next));
   assert.deepEqual(drops, [{ tier: current, x: 150, y: GAME.DROP_Y }]);
   assert.equal(game.maxTier, current);
 });
@@ -241,7 +243,7 @@ test('restart 後狀態歸零，保留最高分', () => {
   assert.equal(game.maxTier, 0);
   assert.equal(game.overTime, 0);
   assert.equal(game.best, best);
-  assert.ok([1, 2, 3, 4].includes(game.current) && [1, 2, 3, 4].includes(game.next));
+  assert.ok([1, 2, 3, 4, 5].includes(game.current) && [1, 2, 3, 4, 5].includes(game.next));
   assert.ok(game.drop(), 'restart 後可以立即投放');
   substeps(game, stepsFor(GAME.OVER_LINE_LIMIT) + 10);
   assert.equal(game.state, 'playing', '舊的超線狀態不應延續');
@@ -259,4 +261,90 @@ test('restart 後第一次合成出月亮會再次觸發 moon 事件', () => {
   game.world.addFruit(8, 270, 500);
   substeps(game, 1);
   assert.equal(moons.length, 2);
+});
+
+// ---- 難度等級（SPEC 3.3、AC17） ----
+
+/** 用兩個同階物件合成來加分。 */
+function mergePair(game, tier, y = 400) {
+  const r = radiusOf(tier);
+  game.world.addFruit(tier, 200 - r * 0.6, y);
+  game.world.addFruit(tier, 200 + r * 0.6, y);
+  substeps(game, 1);
+}
+
+test('levelFor 依分數門檻回傳等級索引', () => {
+  assert.equal(levelFor(0), 0);
+  assert.equal(levelFor(LEVELS[1].minScore - 1), 0);
+  assert.equal(levelFor(LEVELS[1].minScore), 1);
+  assert.equal(levelFor(LEVELS[2].minScore + 1), 2);
+  assert.equal(levelFor(1e9), LEVELS.length - 1);
+});
+
+test('新局從 Lv.1 開始', () => {
+  const game = newGame();
+  assert.equal(game.level, 0);
+});
+
+test('分數跨過門檻時升級，levelup 只發一次', () => {
+  const game = newGame();
+  const ups = [];
+  game.on('levelup', (e) => ups.push(e));
+  mergePair(game, 7); // +128
+  assert.equal(game.level, 0);
+  game.world.clear();
+  mergePair(game, 7); // +128 → 256 ≥ 200
+  assert.equal(game.score, 256);
+  assert.equal(game.level, 1);
+  assert.deepEqual(ups, [{ level: 1 }]);
+  substeps(game, 30);
+  assert.equal(ups.length, 1, '同一級不應重複發 levelup');
+});
+
+test('一次跳多級時只發一次 levelup，帶最終等級', () => {
+  const game = newGame();
+  const ups = [];
+  game.on('levelup', (e) => ups.push(e));
+  mergePair(game, 8, 500); // 合成月亮 +500 → 直接到 Lv.3
+  assert.equal(game.level, 2);
+  assert.deepEqual(ups, [{ level: 2 }]);
+});
+
+test('升級後生成機率切換到該等級', () => {
+  const game = newGame({ seed: 3 });
+  mergePair(game, 8, 500); // → Lv.3
+  // 大量投放並統計第 5 階的比例（Lv.3 為 13%，Lv.1 為 8%）
+  let fives = 0;
+  const N = 1000;
+  for (let i = 0; i < N; i++) {
+    if (game.current === 5) fives++;
+    game.world.clear();
+    game.drop();
+    substeps(game, 31);
+  }
+  const ratio = fives / N;
+  assert.ok(ratio > 0.105, `第 5 階比例 ${ratio.toFixed(3)} 沒有提高`);
+});
+
+test('升級後超線容許時間變短', () => {
+  const game = newGame();
+  mergePair(game, 8, 500); // → Lv.3
+  game.world.clear();
+  const limit = LEVELS[2].overLineLimit;
+  stuckAboveLine(game);
+  substeps(game, stepsFor(limit) - 10);
+  assert.equal(game.state, 'playing');
+  substeps(game, 20);
+  assert.equal(game.state, 'over', `Lv.3 應在 ${limit}ms 結束`);
+});
+
+test('restart 回到 Lv.1，容許時間也恢復', () => {
+  const game = newGame();
+  mergePair(game, 8, 500);
+  assert.equal(game.level, 2);
+  game.restart();
+  assert.equal(game.level, 0);
+  stuckAboveLine(game);
+  substeps(game, stepsFor(LEVELS[2].overLineLimit) + 10);
+  assert.equal(game.state, 'playing', 'restart 後應恢復 Lv.1 的容許時間');
 });
