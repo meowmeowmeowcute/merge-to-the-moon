@@ -30,7 +30,10 @@ export const GAME = Object.freeze({
   DROP_COOLDOWN: 500,
   DROP_GRACE: 1500,
   OVER_LINE_LIMIT: 2000,
-  SPAWN_WEIGHTS: Object.freeze({ 1: 0.6, 2: 0.4 }),
+  SPAWN_WEIGHTS: Object.freeze({ 1: 0.4, 2: 0.3, 3: 0.2, 4: 0.1 }),
+  MERGE_POP: 4,
+  MERGE_PUSH: 3,
+  MERGE_PUSH_RANGE: 12,
 });
 
 export const tierInfo = (tier) => TIERS[tier - 1];

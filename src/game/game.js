@@ -98,7 +98,7 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
     }
   }
 
-  function handleMerge({ fromTier, toTier, x, y }) {
+  function handleMerge({ fromTier, toTier, x, y, body }) {
     const gained = tierInfo(toTier).score;
     game.score += gained;
     game.maxTier = Math.max(game.maxTier, toTier);
@@ -106,7 +106,7 @@ export function createGame(Matter, { seed = Date.now(), storage = null } = {}) {
       game.best = game.score;
       saveBest(storage, game.best);
     }
-    emit('merge', { fromTier, toTier, x, y, gained, score: game.score });
+    emit('merge', { fromTier, toTier, x, y, gained, score: game.score, body });
     if (toTier === MAX_TIER && !moonSeen) {
       moonSeen = true;
       emit('moon', { x, y });
